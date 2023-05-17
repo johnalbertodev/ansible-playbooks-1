@@ -11,9 +11,8 @@
         name: aptitude
         state: latest
         update_cache: true
-
     - name: Install required system packages
-      apt:   
+      apt:
         pkg:
           - apt-transport-https
           - ca-certificates
@@ -24,54 +23,64 @@
           - python3-setuptools
         state: latest
         update_cache: true
-
     - name: Add Docker GPG apt Key
       apt_key:
         url: https://download.docker.com/linux/ubuntu/gpg
         state: present
-
     - name: Add Docker Repository
       apt_repository:
         repo: deb https://download.docker.com/linux/ubuntu focal stable
         state: present
-
     - name: Update apt and install docker-ce
       apt:
         name: docker-ce
         state: latest
         update_cache: true
-
     - name: Install Docker Module for Python
       pip:
         name: docker
- 
     - name: Add Ubuntu user to Docker group
       user:
         name: ubuntu
         groups: docker
         append: yes
-
     - name: Create webcontainer directory
       file:
-	path: /home/ubuntu/webcontainer
-	state: directory
-
+        path: /home/ubuntu/webcontainer
+        state: directory
     - name: Create webcontent
       template:
-	src: index.html.j2
-	dest: /home/ubuntu/webcontainer/index.html
-	owner: ubuntu
-	group: docker
-	mode: 0774
-
+        src: index.html.j2
+        dest: /home/ubuntu/webcontainer/index.html
+        owner: ubuntu
+        group: docker
+        mode: 774
+    - name: Create haproxy config directory
+      file:
+        path: /home/ubuntu/loadbalancer
+        state: directory
+    - name: Create haproxy.cfg
+      template:
+        src: haproxy.cfg.j2
+        dest: /home/ubuntu/loadbalancer/haproxy.cfg
+        owner: ubuntu
+        group: docker
+        mode: 774
     - name: Create webserver containers
       community.docker.docker_container:
         name: "{{ http_container_name }}{{ item }}"
         image: "{{ http_container_image }}"
-        state: started 
+        state: started
         volumes:
           - /home/ubuntu/webcontainer/:/usr/local/apache2/htdocs/
         ports:
-        - "808{{ item }}:80"
+          - 808{{ item }}:80
       with_sequence: count={{ http_container_count }}
-
+    - name: Create Haproxy container
+      community.docker.docker_container:
+        name: loadbalancer
+        image: haproxy
+        state: started 
+        volumes:
+          - /home/ubuntu/loadbalancer/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg
+        network_mode: host
